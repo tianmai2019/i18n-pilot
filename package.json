@@ -1,0 +1,41 @@
+{
+  "name": "i18n-pilot",
+  "version": "0.0.1",
+  "description": "AI-powered internationalization assistant for modern frontend projects",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "i18n-pilot": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "start": "node dist/index.js",
+    "demo": "node dist/demo.js"
+  },
+  "keywords": [
+    "i18n",
+    "ai",
+    "translation",
+    "localization",
+    "cli"
+  ],
+  "author": "PanZhang",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "node-fetch": "^3.3.2",
+    "commander": "^11.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.1",
+    "@types/node": "^20.4.2",
+    "eslint": "^8.48.0",
+    "@typescript-eslint/parser": "^7.9.0",
+    "@typescript-eslint/eslint-plugin": "^7.9.0",
+    "prettier": "^3.8.0",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-prettier": "^5.0.0"
+  }
+}
