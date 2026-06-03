@@ -1,7 +1,7 @@
 {
   "name": "i18n-pilot",
   "version": "0.0.1",
-  "description": "AI-powered internationalization assistant for modern frontend projects",
+  "description": "I18n quality gate and debt scanner for modern frontend projects",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -15,27 +15,32 @@
   },
   "keywords": [
     "i18n",
-    "ai",
-    "translation",
     "localization",
+    "l10n",
+    "scanner",
+    "quality",
+    "ci",
     "cli"
   ],
   "author": "PanZhang",
   "license": "MIT",
   "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^11.0.0",
     "dotenv": "^17.4.2",
     "node-fetch": "^3.3.2",
-    "commander": "^11.0.0"
+    "ora": "^9.4.0",
+    "ts-morph": "^28.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "ts-node": "^10.9.1",
-    "@types/node": "^20.4.2",
-    "eslint": "^8.48.0",
-    "@typescript-eslint/parser": "^7.9.0",
+    "@types/node": "^20.19.41",
     "@typescript-eslint/eslint-plugin": "^7.9.0",
-    "prettier": "^3.8.0",
+    "@typescript-eslint/parser": "^7.9.0",
+    "eslint": "^8.48.0",
     "eslint-config-prettier": "^9.1.2",
-    "eslint-plugin-prettier": "^5.0.0"
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.8.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.4.0"
   }
 }

@@ -2,51 +2,46 @@
 
 English | [简体中文](./README.zh-CN.md)
 
-> AI-powered internationalization tooling for modern frontend projects.
+> I18n quality gate and debt scanner for modern frontend projects.
 
 ![i18n-pilot logo](./assets/logo.svg)
 
 ## Overview
 
-`i18n-pilot` is an early-stage CLI tool that helps developers find user-facing text in a codebase and prepare it for internationalization. The current demo focuses on React/JSX files with Chinese text, extracts translatable strings, and sends them to an AI translation API.
+`i18n-pilot` is an early-stage CLI tool that helps teams find internationalization debt before it reaches production.
 
-This repository is currently in MVP exploration mode. The goal is to validate a simple workflow first, then gradually grow it into a practical i18n assistant for global products.
+It does not try to be another one-off AI translation tool. Instead, the first version focuses on detection: scanning source code, finding hardcoded user-facing text, and reporting where your project still needs i18n work.
+
+The long-term goal is to become a lightweight i18n quality gate for modern frontend teams: CLI first, then CI checks, pull request reports, historical trends, and project-level i18n memory.
+
+## Why This Exists
+
+AI editors can translate a string once. They usually do not continuously answer questions like:
+
+- Did this pull request introduce new hardcoded user-facing text?
+- Which files have the highest i18n debt?
+- Is our i18n debt getting better or worse over time?
+- Which strings are already handled by `t()`, `$t()`, or `formatMessage()`?
+- Can CI block regressions before they reach production?
+
+`i18n-pilot` focuses on these engineering governance problems.
 
 ## What It Does Today
 
-- Reads a React/JSX example file
-- Extracts Chinese strings from the source code
-- Translates extracted strings with the Volcengine Ark API
-- Provides a basic TypeScript CLI skeleton powered by Commander
-- Includes both JavaScript/TypeScript and Python demo code
+The current MVP can:
 
-## Project Structure
+- Scan a project directory from the command line
+- Detect hardcoded Chinese strings in JavaScript / TypeScript / JSX / TSX files
+- Detect Chinese text in JSX text nodes
+- Skip common generated or dependency folders such as `node_modules`, `.git`, `dist`, and `backup`
+- Print a grouped terminal report with file names, line numbers, and rule messages
 
-```text
-code/
-├── src/
-│   ├── api.js          # Volcengine Ark API call demo
-│   ├── extractor.js    # File reading and Chinese string extraction
-│   ├── demo.js         # JavaScript demo flow
-│   ├── cli.ts          # TypeScript CLI entry definition
-│   └── index.ts        # TypeScript CLI runtime entry
-├── examples/
-│   └── TestComponent.jsx
-├── demo.py             # Python demo version
-├── assets/
-│   └── logo.svg
-├── package.json
-└── tsconfig.json
-```
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
 - npm
-- Python 3, if you want to run the Python demo
-- A Volcengine Ark API key and model endpoint ID
 
 ### Install Dependencies
 
@@ -55,71 +50,95 @@ cd code
 npm install
 ```
 
-### Build the TypeScript CLI
+### Build the CLI
 
 ```bash
 npm run build
 ```
 
-### Run the CLI Demo Command
+### Scan the Example Project
 
 ```bash
-node dist/index.js translate "你好，世界"
+node dist/index.js scan examples
 ```
 
-Expected output:
+Example output:
 
 ```text
-Translate request: 你好，世界
+🔍 i18n-pilot scan
+   Scanning: examples
+
+Scan Results:
+────────────────────────────────────────────────────────────
+  Files scanned:  1
+  Issues found:   8
+────────────────────────────────────────────────────────────
 ```
 
-> Note: the current TypeScript CLI command is a placeholder and does not call the real API yet.
+### Future npm Usage
 
-## Run the Translation Demo
-
-### Option 1: Python Demo
+After the package is published, the target usage is:
 
 ```bash
-cd code
-python3 demo.py
+npx i18n-pilot scan ./src
 ```
 
-### Option 2: JavaScript Demo
+## Project Structure
 
-```bash
-cd code
-npm run build
-npm run demo
+```text
+code/
+├── src/
+│   ├── cli.ts                         # CLI command definitions
+│   ├── index.ts                       # CLI runtime entry
+│   ├── scanner.ts                     # File traversal and rule execution
+│   ├── rules/
+│   │   └── hardcoded-chinese.ts       # First i18n debt detection rule
+│   └── types/
+│       └── index.ts                   # Rule, issue, and scan result types
+├── backup/                            # Previous translation demo references
+├── examples/
+│   └── TestComponent.jsx
+├── assets/
+│   └── logo.svg
+├── package.json
+└── tsconfig.json
 ```
-
-## API Configuration
-
-The demo uses the Volcengine Ark OpenAI-compatible chat completions endpoint. Configure it with environment variables:
-
-```bash
-export ARK_API_KEY="your-volcengine-ark-api-key"
-export ARK_MODEL="your-model-endpoint-id, for example ep-xxxxxxxx"
-export ARK_API_URL="https://ark.cn-beijing.volces.com/api/v3/chat/completions"
-```
-
-If the API returns `401`, check the following:
-
-1. `ARK_API_KEY` is a Volcengine API key, not a Claude Code or Anthropic key.
-2. `ARK_MODEL` is the model endpoint ID from the Volcengine console.
-3. `ARK_API_URL` matches your Volcengine region and endpoint type.
 
 ## Roadmap
 
-- [ ] Connect the TypeScript CLI to the real translation API
-- [ ] Generate locale JSON files automatically
-- [ ] Support more frontend file types
-- [ ] Add safe write-back for translated source files
-- [ ] Add configuration files for language targets and ignore rules
-- [ ] Publish an MVP package to npm
+### Phase 1: Core CLI
 
-## Why This Project
+- [x] Add `scan` command
+- [x] Add first rule: hardcoded Chinese detection
+- [ ] Detect JSX attributes and template literals more accurately
+- [ ] Ignore already-internationalized strings such as `t('key')` and `$t('key')`
+- [ ] Add `.i18nignore` support
+- [ ] Add JSON output for CI integration
+- [ ] Publish v0.1.0 to npm
 
-Many teams want to reach global users, but i18n work is still repetitive and easy to postpone. `i18n-pilot` aims to make the first step easier: scan the code, understand what needs translation, and help developers ship multilingual products faster.
+### Phase 2: CI and Project Memory
+
+- [ ] Add `check` command for CI quality gates
+- [ ] Add GitHub Action support
+- [ ] Store local scan history under `.i18n-pilot/`
+- [ ] Add `history` and `diff` commands
+
+### Phase 3: Multi-framework and Health Score
+
+- [ ] Support Vue and Next.js projects
+- [ ] Validate locale files
+- [ ] Add an i18n health score
+- [ ] Support community rules
+
+## Positioning
+
+`i18n-pilot` is not a replacement for i18next, vue-i18n, FormatJS, Crowdin, or Lokalise.
+
+It is designed to sit before and around them as a quality gate:
+
+```text
+source code → i18n-pilot scan/check → i18n framework / TMS / CI
+```
 
 ## License
 
