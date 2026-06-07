@@ -6,6 +6,8 @@ export interface Issue {
   line: number;
   column?: number;
   code?: string;
+  context?: 'string' | 'template' | 'jsx-text' | 'jsx-attribute' | 'fallback';
+  suggestion?: string;
 }
 
 export interface Rule {

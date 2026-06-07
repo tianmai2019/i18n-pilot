@@ -25,9 +25,12 @@ export class Scanner {
             for (const entry of entries) {
                 const fullPath = path.join(currentDir, entry.name);
                 if (entry.isDirectory()) {
-                    if (['node_modules', '.git', 'dist', 'backup'].includes(entry.name))
+                    if (['node_modules', '.git', 'dist', 'backup', '__tests__'].includes(entry.name))
                         continue;
                     await walk(fullPath);
+                }
+                else if (/\.(test|spec)\.(tsx?|jsx?)$/.test(entry.name)) {
+                    continue;
                 }
                 else if (/\.(tsx?|jsx?|vue|svelte)$/.test(entry.name)) {
                     fileCount++;
@@ -36,7 +39,8 @@ export class Scanner {
                         allIssues.push(...issues);
                     }
                     catch (err) {
-                        errors.push(`${fullPath}: ${err.message}`);
+                        const message = err instanceof Error ? err.message : String(err);
+                        errors.push(`${fullPath}: ${message}`);
                     }
                 }
             }

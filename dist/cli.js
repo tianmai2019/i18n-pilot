@@ -3,10 +3,7 @@ import chalk from 'chalk';
 import { Scanner } from './scanner.js';
 import hardcodedChinese from './rules/hardcoded-chinese.js';
 const program = new Command();
-program
-    .name('i18n-pilot')
-    .description('CLI for i18n-pilot')
-    .version('0.0.1');
+program.name('i18n-pilot').description('CLI for i18n-pilot').version('0.0.1');
 program
     .command('scan [path]')
     .description('Scan project for i18n issues')
@@ -34,7 +31,8 @@ program
             console.log(chalk.underline(file));
             for (const issue of issues) {
                 const severity = issue.severity === 'warning' ? chalk.yellow('⚠') : chalk.red('✖');
-                console.log(`  ${severity} ${chalk.gray(`L${issue.line}`)}  ${issue.message}`);
+                const context = issue.context ? chalk.gray(`[${issue.context}] `) : '';
+                console.log(`  ${severity} ${chalk.gray(`L${issue.line}`)}  ${context}${issue.message}`);
             }
             console.log();
         }
