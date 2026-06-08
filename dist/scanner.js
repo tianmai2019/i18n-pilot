@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import path from 'path';
+import { resolveFiles } from './utils/file-resolver.js';
 export class Scanner {
     constructor() {
         this.rules = [];
@@ -16,36 +16,38 @@ export class Scanner {
         }
         return issues;
     }
-    async scanDirectory(dir) {
+    async scan(options) {
+        const { targetPath, extensions, ignorePatterns, useI18nIgnore = true, onProgress } = options;
+        const { files, ignoredCount, i18nIgnoreLoaded } = await resolveFiles({
+            targetPath,
+            extensions,
+            ignorePatterns,
+            useI18nIgnore,
+        });
         const allIssues = [];
         const errors = [];
-        let fileCount = 0;
-        const walk = async (currentDir) => {
-            const entries = await fs.readdir(currentDir, { withFileTypes: true });
-            for (const entry of entries) {
-                const fullPath = path.join(currentDir, entry.name);
-                if (entry.isDirectory()) {
-                    if (['node_modules', '.git', 'dist', 'backup', '__tests__'].includes(entry.name))
-                        continue;
-                    await walk(fullPath);
-                }
-                else if (/\.(test|spec)\.(tsx?|jsx?)$/.test(entry.name)) {
-                    continue;
-                }
-                else if (/\.(tsx?|jsx?|vue|svelte)$/.test(entry.name)) {
-                    fileCount++;
-                    try {
-                        const issues = await this.scanFile(fullPath);
-                        allIssues.push(...issues);
-                    }
-                    catch (err) {
-                        const message = err instanceof Error ? err.message : String(err);
-                        errors.push(`${fullPath}: ${message}`);
-                    }
-                }
+        const total = files.length;
+        for (let i = 0; i < total; i++) {
+            const file = files[i];
+            if (onProgress) {
+                onProgress(i + 1, total, file);
             }
+            try {
+                const issues = await this.scanFile(file);
+                allIssues.push(...issues);
+            }
+            catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                errors.push(`${file}: ${message}`);
+            }
+        }
+        return {
+            fileCount: total,
+            issueCount: allIssues.length,
+            issues: allIssues,
+            errors,
+            ignoredCount,
+            i18nIgnoreLoaded,
         };
-        await walk(dir);
-        return { fileCount, issueCount: allIssues.length, issues: allIssues, errors };
     }
 }

@@ -1,5 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
+import ora from 'ora';
+import path from 'path';
 import { Scanner } from './scanner.js';
 import hardcodedChinese from './rules/hardcoded-chinese.js';
 
@@ -10,46 +12,81 @@ program.name('i18n-pilot').description('CLI for i18n-pilot').version('0.0.1');
 program
   .command('scan [path]')
   .description('Scan project for i18n issues')
-  .action(async (scanPath: string | undefined) => {
-    const targetPath = scanPath || process.cwd();
-    console.log(chalk.bold('\n🔍 i18n-pilot scan'));
-    console.log(chalk.gray(`   Scanning: ${targetPath}\n`));
+  .option('--no-i18nignore', 'Disable .i18nignore support')
+  .option('--ext <extensions...>', 'File extensions to scan (e.g., ts tsx js jsx)')
+  .option('--ignore <patterns...>', 'Additional glob patterns to ignore')
+  .action(
+    async (
+      scanPath: string | undefined,
+      opts: { i18nignore?: boolean; ext?: string[]; ignore?: string[] }
+    ) => {
+      const targetPath = scanPath || process.cwd();
+      console.log(chalk.bold('\n🔍 i18n-pilot scan'));
+      console.log(chalk.gray(`   Scanning: ${targetPath}\n`));
 
-    const scanner = new Scanner();
-    scanner.addRule(hardcodedChinese);
+      const spinner = ora({ text: 'Resolving files...', color: 'cyan' }).start();
 
-    const result = await scanner.scanDirectory(targetPath);
+      const scanner = new Scanner();
+      scanner.addRule(hardcodedChinese);
 
-    console.log(chalk.bold('Scan Results:'));
-    console.log(chalk.gray('─'.repeat(60)));
-    console.log(`  Files scanned:  ${chalk.cyan(result.fileCount.toString())}`);
-    console.log(`  Issues found:   ${chalk.yellow(result.issueCount.toString())}`);
-    console.log(chalk.gray('─'.repeat(60)));
+      let lastUpdate = 0;
+      const result = await scanner.scan({
+        targetPath,
+        extensions: opts.ext,
+        ignorePatterns: opts.ignore,
+        useI18nIgnore: opts.i18nignore !== false,
+        onProgress: (current, total, file) => {
+          const now = Date.now();
+          if (now - lastUpdate > 50 || current === total) {
+            lastUpdate = now;
+            const shortFile = path.relative(targetPath, file) || file;
+            spinner.text = `Scanning [${current}/${total}] ${shortFile}`;
+          }
+        },
+      });
 
-    if (result.issues.length > 0) {
-      console.log('\n' + chalk.bold('Issues:\n'));
-      const byFile = new Map<string, typeof result.issues>();
-      for (const issue of result.issues) {
-        if (!byFile.has(issue.file)) byFile.set(issue.file, []);
-        byFile.get(issue.file)!.push(issue);
+      spinner.succeed(`Scanned ${chalk.cyan(result.fileCount.toString())} files`);
+
+      if (result.i18nIgnoreLoaded) {
+        console.log(chalk.gray(`   .i18nignore loaded`));
       }
-      for (const [file, issues] of byFile) {
-        console.log(chalk.underline(file));
-        for (const issue of issues) {
-          const severity = issue.severity === 'warning' ? chalk.yellow('⚠') : chalk.red('✖');
-          const context = issue.context ? chalk.gray(`[${issue.context}] `) : '';
-          console.log(`  ${severity} ${chalk.gray(`L${issue.line}`)}  ${context}${issue.message}`);
+      if (result.ignoredCount > 0) {
+        console.log(chalk.gray(`   ${result.ignoredCount} files ignored by .i18nignore`));
+      }
+
+      console.log(chalk.gray('─'.repeat(60)));
+      console.log(`  Files scanned:  ${chalk.cyan(result.fileCount.toString())}`);
+      console.log(`  Issues found:   ${chalk.yellow(result.issueCount.toString())}`);
+      console.log(chalk.gray('─'.repeat(60)));
+
+      if (result.issues.length > 0) {
+        console.log('\n' + chalk.bold('Issues:\n'));
+        const byFile = new Map<string, typeof result.issues>();
+        for (const issue of result.issues) {
+          if (!byFile.has(issue.file)) byFile.set(issue.file, []);
+          byFile.get(issue.file)!.push(issue);
         }
-        console.log();
+        for (const [file, issues] of byFile) {
+          const displayFile = path.relative(targetPath, file) || file;
+          console.log(chalk.underline(displayFile));
+          for (const issue of issues) {
+            const severity = issue.severity === 'warning' ? chalk.yellow('⚠') : chalk.red('✖');
+            const context = issue.context ? chalk.gray(`[${issue.context}] `) : '';
+            console.log(
+              `  ${severity} ${chalk.gray(`L${issue.line}`)}  ${context}${issue.message}`
+            );
+          }
+          console.log();
+        }
+      } else {
+        console.log(chalk.green('\n  ✓ No i18n issues found!\n'));
       }
-    } else {
-      console.log(chalk.green('\n  ✓ No i18n issues found!\n'));
-    }
 
-    if (result.errors.length > 0) {
-      console.log(chalk.red('\nErrors:'));
-      for (const err of result.errors) console.log(`  ✖ ${err}`);
+      if (result.errors.length > 0) {
+        console.log(chalk.red('\nErrors:'));
+        for (const err of result.errors) console.log(`  ✖ ${err}`);
+      }
     }
-  });
+  );
 
 export default program;
