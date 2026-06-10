@@ -1,18 +1,30 @@
 import fs from 'fs/promises';
+import { Project } from 'ts-morph';
 import { resolveFiles } from './utils/file-resolver.js';
+import { RuleRegistry } from './rules/registry.js';
+const DEFAULT_RULE_SETTINGS = {
+    i18nCallees: ['t', '$t'],
+    whitelist: [],
+};
 export class Scanner {
-    constructor() {
-        this.rules = [];
+    constructor(registry = new RuleRegistry()) {
+        this.registry = registry;
     }
     addRule(rule) {
-        this.rules.push(rule);
+        this.registry.register(rule);
     }
-    async scanFile(file) {
-        const content = await fs.readFile(file, 'utf-8');
+    async scanFile(file, content, project, options) {
+        const settings = {
+            ...DEFAULT_RULE_SETTINGS,
+            ...options?.settings,
+            whitelist: options?.whitelist ?? options?.settings?.whitelist ?? DEFAULT_RULE_SETTINGS.whitelist,
+        };
+        const sourceFile = project.createSourceFile(file, content, { overwrite: true });
         const issues = [];
-        for (const rule of this.rules) {
-            const ruleIssues = await rule.check(file, content);
-            issues.push(...ruleIssues);
+        for (const { rule, severity } of this.registry.resolve(options?.ruleConfig)) {
+            const ruleOptions = { severity, settings, sourceFile };
+            const ruleIssues = await rule.check(file, content, ruleOptions);
+            issues.push(...ruleIssues.map((issue) => ({ ...issue, severity })));
         }
         return issues;
     }
@@ -27,14 +39,20 @@ export class Scanner {
         const allIssues = [];
         const errors = [];
         const total = files.length;
+        // Create single project instance for all files
+        const project = new Project({ useInMemoryFileSystem: true });
         for (let i = 0; i < total; i++) {
             const file = files[i];
             if (onProgress) {
                 onProgress(i + 1, total, file);
             }
             try {
-                const issues = await this.scanFile(file);
+                const content = await fs.readFile(file, 'utf-8');
+                const sourceFileCount = project.getSourceFiles().length;
+                const issues = await this.scanFile(file, content, project, options);
                 allIssues.push(...issues);
+                // Clear cached source files to save memory
+                project.removeSourceFile(project.getSourceFiles()[sourceFileCount]);
             }
             catch (err) {
                 const message = err instanceof Error ? err.message : String(err);

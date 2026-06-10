@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import hardcodedChinese from '../hardcoded-chinese.js';
+import { checkRule } from './test-utils.js';
 
 async function check(code: string, file = 'test.tsx') {
-  return hardcodedChinese.check(file, code);
+  return checkRule(hardcodedChinese, code, file);
 }
 
 describe('hardcoded-chinese rule', () => {

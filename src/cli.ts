@@ -3,31 +3,56 @@ import chalk from 'chalk';
 import ora from 'ora';
 import path from 'path';
 import { Scanner } from './scanner.js';
-import hardcodedChinese from './rules/hardcoded-chinese.js';
+import { formatIssues } from './formatters/index.js';
+import { RuleRegistry } from './rules/registry.js';
+import { parseRuleConfig, parseOutputFormat } from './utils/cli/validation.js';
+import type { OutputFormat, RuleConfig } from './types/index.js';
 
 const program = new Command();
 
-program.name('i18n-pilot').description('CLI for i18n-pilot').version('0.0.1');
+interface ScanCommandOptions {
+  i18nignore?: boolean;
+  ext?: string[];
+  ignore?: string[];
+  format?: string;
+  rule?: string[];
+  whitelist?: string[];
+}
 
+program.name('i18n-pilot').description('CLI for i18n-pilot').version('0.0.1');
 program
   .command('scan [path]')
   .description('Scan project for i18n issues')
   .option('--no-i18nignore', 'Disable .i18nignore support')
   .option('--ext <extensions...>', 'File extensions to scan (e.g., ts tsx js jsx)')
   .option('--ignore <patterns...>', 'Additional glob patterns to ignore')
-  .action(
-    async (
-      scanPath: string | undefined,
-      opts: { i18nignore?: boolean; ext?: string[]; ignore?: string[] }
-    ) => {
-      const targetPath = scanPath || process.cwd();
-      console.log(chalk.bold('\n🔍 i18n-pilot scan'));
-      console.log(chalk.gray(`   Scanning: ${targetPath}\n`));
+  .option('--format <format>', 'Output format: stylish or compact', 'stylish')
+  .option('--rule <rules...>', 'Rule config entries (e.g., jsx-text=off string-literals=error)')
+  .option('--whitelist <strings...>', 'Exact strings to ignore')
+  .action(async (scanPath: string | undefined, opts: ScanCommandOptions) => {
+    let format: OutputFormat;
+    let ruleConfig: RuleConfig;
 
-      const spinner = ora({ text: 'Resolving files...', color: 'cyan' }).start();
+    try {
+      format = parseOutputFormat(opts.format);
+      ruleConfig = parseRuleConfig(opts.rule);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(chalk.red(message));
+      process.exitCode = 1;
+      return;
+    }
 
-      const scanner = new Scanner();
-      scanner.addRule(hardcodedChinese);
+    const targetPath = path.resolve(scanPath || process.cwd());
+    console.log(chalk.bold('\n🔍 i18n-pilot scan'));
+    console.log(chalk.gray(`   Scanning: ${targetPath}\n`));
+
+    const spinner = ora({ text: 'Resolving files...', color: 'cyan' }).start();
+
+    try {
+      // Auto-discover all rules instead of manual registration
+      const registry = await RuleRegistry.autoDiscover();
+      const scanner = new Scanner(registry);
 
       let lastUpdate = 0;
       const result = await scanner.scan({
@@ -35,6 +60,8 @@ program
         extensions: opts.ext,
         ignorePatterns: opts.ignore,
         useI18nIgnore: opts.i18nignore !== false,
+        ruleConfig,
+        whitelist: opts.whitelist,
         onProgress: (current, total, file) => {
           const now = Date.now();
           if (now - lastUpdate > 50 || current === total) {
@@ -45,48 +72,29 @@ program
         },
       });
 
-      spinner.succeed(`Scanned ${chalk.cyan(result.fileCount.toString())} files`);
+      spinner.succeed(
+        `Scan completed! Found ${result.issueCount} issues across ${result.fileCount} files`
+      );
 
-      if (result.i18nIgnoreLoaded) {
-        console.log(chalk.gray(`   .i18nignore loaded`));
-      }
       if (result.ignoredCount > 0) {
-        console.log(chalk.gray(`   ${result.ignoredCount} files ignored by .i18nignore`));
-      }
-
-      console.log(chalk.gray('─'.repeat(60)));
-      console.log(`  Files scanned:  ${chalk.cyan(result.fileCount.toString())}`);
-      console.log(`  Issues found:   ${chalk.yellow(result.issueCount.toString())}`);
-      console.log(chalk.gray('─'.repeat(60)));
-
-      if (result.issues.length > 0) {
-        console.log('\n' + chalk.bold('Issues:\n'));
-        const byFile = new Map<string, typeof result.issues>();
-        for (const issue of result.issues) {
-          if (!byFile.has(issue.file)) byFile.set(issue.file, []);
-          byFile.get(issue.file)!.push(issue);
-        }
-        for (const [file, issues] of byFile) {
-          const displayFile = path.relative(targetPath, file) || file;
-          console.log(chalk.underline(displayFile));
-          for (const issue of issues) {
-            const severity = issue.severity === 'warning' ? chalk.yellow('⚠') : chalk.red('✖');
-            const context = issue.context ? chalk.gray(`[${issue.context}] `) : '';
-            console.log(
-              `  ${severity} ${chalk.gray(`L${issue.line}`)}  ${context}${issue.message}`
-            );
-          }
-          console.log();
-        }
-      } else {
-        console.log(chalk.green('\n  ✓ No i18n issues found!\n'));
+        console.log(chalk.gray(`   Ignored ${result.ignoredCount} files`));
       }
 
       if (result.errors.length > 0) {
-        console.log(chalk.red('\nErrors:'));
-        for (const err of result.errors) console.log(`  ✖ ${err}`);
+        console.log(chalk.yellow(`   Encountered ${result.errors.length} errors`));
       }
+
+      if (result.issueCount > 0) {
+        console.log('\n' + formatIssues(format, result.issues, { targetPath }));
+      }
+
+      process.exit(result.issueCount > 0 ? 1 : 0);
+    } catch (err: unknown) {
+      spinner.fail('Scan failed');
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(chalk.red(message));
+      process.exitCode = 1;
     }
-  );
+  });
 
 export default program;

@@ -1,6 +1,24 @@
+import type { SourceFile } from 'ts-morph';
+
+export type Severity = 'error' | 'warning' | 'info';
+export type RuleLevel = Severity | 'off';
+export type RuleConfig = Record<string, RuleLevel>;
+export type OutputFormat = 'stylish' | 'compact';
+
+export interface RuleSettings {
+  i18nCallees: string[];
+  whitelist: string[];
+}
+
+export interface RuleOptions {
+  severity: Severity;
+  settings: RuleSettings;
+  sourceFile?: SourceFile;
+}
+
 export interface Issue {
   rule: string;
-  severity: 'error' | 'warning' | 'info';
+  severity: Severity;
   message: string;
   file: string;
   line: number;
@@ -8,12 +26,16 @@ export interface Issue {
   code?: string;
   context?: 'string' | 'template' | 'jsx-text' | 'jsx-attribute' | 'fallback';
   suggestion?: string;
+  snippet?: string;
+  component?: string;
+  functionName?: string;
 }
 
 export interface Rule {
   name: string;
   description: string;
-  check(file: string, content: string): Promise<Issue[]>;
+  defaultSeverity?: Severity;
+  check(file: string, content: string, options: RuleOptions): Promise<Issue[]>;
 }
 
 export interface ScanOptions {
@@ -21,6 +43,9 @@ export interface ScanOptions {
   extensions?: string[];
   ignorePatterns?: string[];
   useI18nIgnore?: boolean;
+  ruleConfig?: RuleConfig;
+  settings?: Partial<RuleSettings>;
+  whitelist?: string[];
   onProgress?: (current: number, total: number, file: string) => void;
 }
 

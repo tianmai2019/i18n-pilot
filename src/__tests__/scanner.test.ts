@@ -168,4 +168,32 @@ describe('Scanner', () => {
     expect(result.issueCount).toBe(0);
     expect(result.errors).toHaveLength(0);
   });
+
+  it('skips rules configured as off', async () => {
+    await touch('src/bad.ts', 'const a = "BAD"');
+
+    const scanner = new Scanner();
+    scanner.addRule(mockRule);
+
+    const result = await scanner.scan({
+      targetPath: tmpDir,
+      ruleConfig: { 'mock-rule': 'off' },
+    });
+
+    expect(result.issueCount).toBe(0);
+  });
+
+  it('overrides issue severity from rule config', async () => {
+    await touch('src/bad.ts', 'const a = "BAD"');
+
+    const scanner = new Scanner();
+    scanner.addRule(mockRule);
+
+    const result = await scanner.scan({
+      targetPath: tmpDir,
+      ruleConfig: { 'mock-rule': 'info' },
+    });
+
+    expect(result.issues[0].severity).toBe('info');
+  });
 });
