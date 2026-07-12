@@ -1,0 +1,84 @@
+name: i18n-pilot
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '**.js'
+      - '**.jsx'
+      - '**.ts'
+      - '**.tsx'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**.js'
+      - '**.jsx'
+      - '**.ts'
+      - '**.tsx'
+  workflow_dispatch:
+
+jobs:
+  i18n-pilot:
+    name: i18n-pilot Check
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run i18n-pilot scan (HTML report)
+        run: |
+          mkdir -p reports
+          node dist/index.js scan ./src --format html > reports/i18n-report.html
+        continue-on-error: true
+
+      - name: Run i18n-pilot scan (JSON report)
+        run: node dist/index.js scan ./src --format json > reports/i18n-report.json
+        continue-on-error: true
+
+      - name: Run i18n-pilot scan (SARIF report)
+        run: node dist/index.js scan ./src --format sarif > reports/i18n-report.sarif
+        continue-on-error: true
+
+      - name: Upload SARIF report to GitHub Advanced Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: reports/i18n-report.sarif
+          category: i18n-pilot
+
+      - name: Upload HTML report artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: i18n-report-html
+          path: reports/i18n-report.html
+          retention-days: 30
+
+      - name: Upload JSON report artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: i18n-report-json
+          path: reports/i18n-report.json
+          retention-days: 30
+
+      - name: Fail if i18n issues found
+        run: |
+          node dist/index.js scan ./src --format compact

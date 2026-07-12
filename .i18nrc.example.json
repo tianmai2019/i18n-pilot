@@ -1,0 +1,15 @@
+{
+  "extends": "recommended",
+  "rules": {
+    "jsx-text": "error",
+    "jsx-attributes": "warning",
+    "template-literals": "warning",
+    "string-literals": "info"
+  },
+  "settings": {
+    "i18nCallees": ["t", "$t", "i18n.t"]
+  },
+  "whitelist": ["中文", "专有名词"],
+  "ignore": ["node_modules/**", "dist/**", "build/**"],
+  "extensions": ["ts", "tsx", "js", "jsx"]
+}
