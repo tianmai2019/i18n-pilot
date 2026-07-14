@@ -1,6 +1,6 @@
 {
   "name": "i18n-pilot",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "I18n quality gate and debt scanner for modern frontend projects",
   "type": "module",
   "main": "dist/index.js",
