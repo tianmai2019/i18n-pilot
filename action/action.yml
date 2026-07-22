@@ -22,6 +22,14 @@ inputs:
     description: 'Incremental scan mode. "auto" scans only PR-changed files; "full" always scans the entire path.'
     required: false
     default: 'auto'
+  fail-on:
+    description: 'Severity level that fails the job. Options: error | warning | never. Default: error.'
+    required: false
+    default: 'error'
+  threshold:
+    description: 'Max number of qualifying issues allowed before failing. 0 means any qualifying issue fails the job.'
+    required: false
+    default: '0'
   output-file:
     description: 'Path to write the report. Defaults to i18n-pilot-report.<format> in the workspace root.'
     required: false
@@ -77,9 +85,9 @@ runs:
         TARGETS: ${{ steps.targets.outputs.paths }}
       run: bash "$GITHUB_ACTION_PATH/scripts/run-scan.sh"
 
-    - name: Ensure JSON report for PR comment
+    - name: Ensure JSON report (for PR comment and/or gate)
       id: json
-      if: github.event_name == 'pull_request' && inputs.comment-on-pr == 'true'
+      if: (github.event_name == 'pull_request' && inputs.comment-on-pr == 'true') || inputs.fail-on != 'never'
       shell: bash
       env:
         INPUT_FORMAT: ${{ inputs.format }}
@@ -114,4 +122,19 @@ runs:
           echo "| Issue count | ${{ steps.scan.outputs.issue-count }} |"
           echo "| Format | ${{ inputs.format }} |"
           echo "| Scanned | \`${{ steps.targets.outputs.paths }}\` |"
+          echo "| fail-on | ${{ inputs.fail-on }} |"
+          echo "| threshold | ${{ inputs.threshold }} |"
         } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Enforce threshold gate
+      if: inputs.fail-on != 'never'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const runGate = require(`${process.env.GITHUB_ACTION_PATH}/scripts/gate.cjs`);
+          await runGate({
+            core,
+            jsonPath: '${{ steps.json.outputs.json-path }}',
+            failOn: '${{ inputs.fail-on }}',
+            threshold: '${{ inputs.threshold }}',
+          });

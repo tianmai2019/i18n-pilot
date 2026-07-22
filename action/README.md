@@ -40,6 +40,8 @@ jobs:
 | `format` | `sarif` | Output format: sarif (recommended for GitHub), json, compact, stylish |
 | `version` | `latest` | Specific i18n-pilot npm version pin |
 | `incremental` | `auto` | `auto` scans only changed files on PR; `full` always scans all files |
+| `fail-on` | `error` | Severity that fails the job: `error` \| `warning` \| `never`. See "Threshold gate" below. |
+| `threshold` | `0` | Max number of qualifying issues allowed. `0` means any qualifying issue fails the job. |
 | `output-file` | auto-generated | Custom path for the report file |
 | `comment-on-pr` | `true` | Post (or update) a Markdown comment on the PR. Requires `pull-requests: write`. |
 | `github-token` | `${{ github.token }}` | Token used to post the PR comment |
@@ -78,6 +80,34 @@ jobs:
   with:
     output-file: './artifacts/i18n-report.sarif'
 ```
+
+### 4. Warning-only mode (never fail)
+
+```yaml
+- uses: tianmai2019/i18n-pilot/action@v0.2
+  with:
+    fail-on: 'never'
+```
+
+### 5. Fail the job if there are more than 20 issues
+
+```yaml
+- uses: tianmai2019/i18n-pilot/action@v0.2
+  with:
+    fail-on: 'error'
+    threshold: 20
+```
+
+## Threshold gate
+
+| `fail-on` | Counts | Behaviour |
+|-----------|--------|-----------|
+| `error` (default) | Only `error`-severity issues | Fails the job if `count(error) > threshold` |
+| `warning` | Both `error` and `warning` | Fails the job if `count(error+warning) > threshold` |
+| `never` | Nothing | The job never fails; scan is advisory only |
+
+`threshold=0` (default) means **any** qualifying issue fails the job.
+Set a higher threshold to allow legacy debt while still gating regressions.
 
 ## How it works
 
