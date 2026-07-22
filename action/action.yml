@@ -1,0 +1,84 @@
+name: 'i18n-pilot'
+description: 'Detect hardcoded strings and enforce i18n quality gate on every PR'
+author: 'PanZhang'
+branding:
+  icon: 'globe'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Path to scan (relative to workspace)'
+    required: false
+    default: '.'
+  format:
+    description: 'Output format: sarif | json | compact | stylish'
+    required: false
+    default: 'sarif'
+  version:
+    description: 'i18n-pilot npm version (default: latest)'
+    required: false
+    default: 'latest'
+  incremental:
+    description: 'Incremental scan mode. "auto" scans only PR-changed files; "full" always scans the entire path.'
+    required: false
+    default: 'auto'
+  output-file:
+    description: 'Path to write the report. Defaults to i18n-pilot-report.<format> in the workspace root.'
+    required: false
+
+outputs:
+  report-path:
+    description: 'Path to the generated report file'
+    value: ${{ steps.scan.outputs.report-path }}
+  issue-count:
+    description: 'Total number of issues found (only accurate for format=json; otherwise "unknown")'
+    value: ${{ steps.scan.outputs.issue-count }}
+  scanned-paths:
+    description: 'Space-separated list of files/paths that were scanned'
+    value: ${{ steps.targets.outputs.paths }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install i18n-pilot
+      shell: bash
+      run: npm install -g i18n-pilot@${{ inputs.version }}
+
+    - name: Resolve scan targets (incremental or full)
+      id: targets
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_INCREMENTAL: ${{ inputs.incremental }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.sha }}
+        EVENT_NAME: ${{ github.event_name }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/incremental.sh"
+
+    - name: Run i18n-pilot scan
+      id: scan
+      shell: bash
+      env:
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_OUTPUT_FILE: ${{ inputs.output-file }}
+        TARGETS: ${{ steps.targets.outputs.paths }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/run-scan.sh"
+
+    - name: Write GitHub step summary
+      shell: bash
+      run: |
+        {
+          echo "## 🌐 i18n-pilot Scan"
+          echo ""
+          echo "| Field | Value |"
+          echo "| --- | --- |"
+          echo "| Report | \`${{ steps.scan.outputs.report-path }}\` |"
+          echo "| Issue count | ${{ steps.scan.outputs.issue-count }} |"
+          echo "| Format | ${{ inputs.format }} |"
+          echo "| Scanned | \`${{ steps.targets.outputs.paths }}\` |"
+        } >> "$GITHUB_STEP_SUMMARY"
