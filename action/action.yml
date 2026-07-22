@@ -25,6 +25,14 @@ inputs:
   output-file:
     description: 'Path to write the report. Defaults to i18n-pilot-report.<format> in the workspace root.'
     required: false
+  comment-on-pr:
+    description: 'Post (or update) a Markdown comment on the PR summarizing the scan. Only applies to pull_request events. Requires pull-requests: write permission.'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'GitHub token used to post PR comments. Defaults to the workflow-provided GITHUB_TOKEN.'
+    required: false
+    default: ${{ github.token }}
 
 outputs:
   report-path:
@@ -68,6 +76,31 @@ runs:
         INPUT_OUTPUT_FILE: ${{ inputs.output-file }}
         TARGETS: ${{ steps.targets.outputs.paths }}
       run: bash "$GITHUB_ACTION_PATH/scripts/run-scan.sh"
+
+    - name: Ensure JSON report for PR comment
+      id: json
+      if: github.event_name == 'pull_request' && inputs.comment-on-pr == 'true'
+      shell: bash
+      env:
+        INPUT_FORMAT: ${{ inputs.format }}
+        REPORT_PATH: ${{ steps.scan.outputs.report-path }}
+        TARGETS: ${{ steps.targets.outputs.paths }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/ensure-json.sh"
+
+    - name: Post PR comment
+      if: github.event_name == 'pull_request' && inputs.comment-on-pr == 'true'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const buildAndPost = require(`${process.env.GITHUB_ACTION_PATH}/scripts/pr-comment.cjs`);
+          await buildAndPost({
+            github,
+            context,
+            core,
+            jsonPath: '${{ steps.json.outputs.json-path }}',
+            scannedPaths: `${{ steps.targets.outputs.paths }}`,
+          });
 
     - name: Write GitHub step summary
       shell: bash

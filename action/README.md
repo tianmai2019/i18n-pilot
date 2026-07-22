@@ -41,6 +41,8 @@ jobs:
 | `version` | `latest` | Specific i18n-pilot npm version pin |
 | `incremental` | `auto` | `auto` scans only changed files on PR; `full` always scans all files |
 | `output-file` | auto-generated | Custom path for the report file |
+| `comment-on-pr` | `true` | Post (or update) a Markdown comment on the PR. Requires `pull-requests: write`. |
+| `github-token` | `${{ github.token }}` | Token used to post the PR comment |
 
 ## Outputs
 
@@ -82,6 +84,23 @@ jobs:
 1. **Pull request events**: Runs `git diff base..head` to find changed `.js/.jsx/.ts/.tsx/.vue` files and scans only those (faster)
 2. **Push / workflow_dispatch**: Scans the full `path`
 3. Outputs SARIF format by default which integrates with GitHub Code Scanning UI
+4. **PR comment**: On PR events, a Markdown summary is posted to the PR (updated on re-runs, not duplicated). Uses a hidden HTML marker to find the previous comment. Requires `pull-requests: write` permission.
+
+### PR comment example
+
+> ⚠️ Found **3** i18n issues in **2** files.
+>
+> **By severity** — 🔴 error: 2, 🟡 warning: 1
+> **By rule** — `jsx-text`: 2, `string-literals`: 1
+> **Top files** — `src/App.tsx` (2), `src/utils.ts` (1)
+>
+> <details><summary>First 3 issues</summary>
+>
+> - `jsx-text` — `src/App.tsx:12` — `你好世界`
+> - `jsx-text` — `src/App.tsx:20` — `按钮`
+> - `string-literals` — `src/utils.ts:8` — `错误消息`
+>
+> </details>
 
 ## Requirements
 
