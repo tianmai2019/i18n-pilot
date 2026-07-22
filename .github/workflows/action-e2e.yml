@@ -1,0 +1,62 @@
+# Temporary workflow used to end-to-end verify the composite Action.
+# Runs the Action against a fixture file that intentionally contains
+# hardcoded Chinese, exercising the full pipeline:
+#   - install (local dogfood mode)
+#   - scan
+#   - PR comment (if PR)
+#   - threshold gate (should FAIL with fail-on=error, threshold=0)
+#
+# We use `continue-on-error` on the Action step so the workflow itself
+# can inspect its outputs; the "verify" step below assets that the gate
+# actually decided to fail.
+#
+# Delete this file once Action v0.2 is published to Marketplace.
+
+name: action-e2e
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'action/**'
+      - 'code/action/**'
+      - '.github/workflows/action-e2e.yml'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run i18n-pilot action (dogfood mode)
+        id: pilot
+        continue-on-error: true
+        uses: ./action
+        with:
+          path: 'action/__fixtures__'
+          format: 'json'
+          version: 'local'
+          incremental: 'full'
+          fail-on: 'error'
+          threshold: 0
+
+      - name: Assert gate failed
+        run: |
+          echo "Outcome: ${{ steps.pilot.outcome }}"
+          echo "Issue count: ${{ steps.pilot.outputs.issue-count }}"
+          if [ "${{ steps.pilot.outcome }}" != "failure" ]; then
+            echo "::error::gate should have failed on the fixture, got outcome=${{ steps.pilot.outcome }}"
+            exit 1
+          fi
+          if [ "${{ steps.pilot.outputs.issue-count }}" -lt 4 ]; then
+            echo "::error::expected at least 4 error-severity issues, got ${{ steps.pilot.outputs.issue-count }}"
+            exit 1
+          fi
+          echo "::notice::E2E ok — gate correctly failed and issue count matches expectations"
