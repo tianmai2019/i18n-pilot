@@ -63,7 +63,17 @@ runs:
 
     - name: Install i18n-pilot
       shell: bash
-      run: npm install -g i18n-pilot@${{ inputs.version }}
+      run: |
+        if [ "${{ inputs.version }}" = "local" ]; then
+          echo "Installing i18n-pilot from local checkout (dogfood mode)"
+          npm ci --prefix "$GITHUB_WORKSPACE"
+          npm run --prefix "$GITHUB_WORKSPACE" build
+          npm install -g "$GITHUB_WORKSPACE"
+          echo "i18n-pilot location: $(which i18n-pilot)"
+          i18n-pilot --version
+        else
+          npm install -g i18n-pilot@${{ inputs.version }}
+        fi
 
     - name: Resolve scan targets (incremental or full)
       id: targets
